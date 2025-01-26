@@ -1,8 +1,8 @@
-FROM php:7.4.2-apache-buster
+FROM php:7.4-fpm
 
 # Surpresses debconf complaints of trying to install apt packages interactively
 # https://github.com/moby/moby/issues/4032#issuecomment-192327844
- 
+
 ARG DEBIAN_FRONTEND=noninteractive
 
 # Update
@@ -62,7 +62,6 @@ RUN apt-get update && \
 RUN docker-php-ext-install pdo_mysql && \
     docker-php-ext-install pdo_sqlite && \
     docker-php-ext-install bcmath && \
-    docker-php-ext-install pcntl && \
     docker-php-ext-install mysqli && \
     docker-php-ext-install curl && \
     docker-php-ext-install tokenizer && \
@@ -79,7 +78,7 @@ RUN apt-get update && \
     apt-get install -y libpq-dev && \
     docker-php-ext-install pdo pdo_pgsql pgsql
 
-# Install Freetype 
+# Install Freetype
 RUN apt-get -y update && \
     apt-get --no-install-recommends install -y libfreetype6-dev \
 libjpeg62-turbo-dev \
@@ -88,23 +87,5 @@ libpng-dev && \
     docker-php-ext-configure gd --enable-gd --with-freetype --with-jpeg && \
     docker-php-ext-install gd
 
-# Insure an SSL directory exists
-RUN mkdir -p /etc/apache2/ssl
-
-# Enable SSL support
-RUN a2enmod ssl && a2enmod rewrite
-
-# Enable apache modules
-RUN a2enmod rewrite headers
-
 # Cleanup
 RUN rm -rf /usr/src/*
-
-RUN apt-get update && \
-    apt-get install -y build-essential libtool autoconf uuid-dev pkg-config libsodium-dev libzmq3-dev && \
-    git clone https://github.com/zeromq/php-zmq.git && \
-    cd php-zmq && \
-    phpize && ./configure && \
-    make && make install && \
-    docker-php-ext-enable zmq;
-
