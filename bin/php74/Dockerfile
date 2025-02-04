@@ -52,10 +52,17 @@ RUN apt-get update && \
     docker-php-ext-enable imagick
 
 # Enable php-imap
-RUN apt-get update && \
-    apt-get install -y \
-        libc-client-dev libkrb5-dev && \
-    rm -r /var/lib/apt/lists/*
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		libc-client-dev \
+		libkrb5-dev \
+	; \
+	rm -rf /var/lib/apt/lists/*
+
+RUN set -eux; \
+	PHP_OPENSSL=yes docker-php-ext-configure imap --with-kerberos --with-imap-ssl; \
+	docker-php-ext-install imap
 
 # Other PHP7 Extensions
 
