@@ -1,117 +1,100 @@
 FROM php:7.4.2-apache-buster
 
-# Surpresses debconf complaints of trying to install apt packages interactively
-# https://github.com/moby/moby/issues/4032#issuecomment-192327844
- 
 ARG DEBIAN_FRONTEND=noninteractive
 
-# Update
-RUN apt-get -y update --fix-missing && \
-    apt-get upgrade -y && \
-    apt-get --no-install-recommends install -y apt-utils && \
+# Обновление пакетов и установка зависимостей
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+    apt-utils \
+    nano \
+    wget \
+    dialog \
+    libsqlite3-dev \
+    libsqlite3-0 \
+    default-mysql-client \
+    zlib1g-dev \
+    libzip-dev \
+    libicu-dev \
+    build-essential \
+    git \
+    curl \
+    libonig-dev \
+    iputils-ping \
+    libcurl4 \
+    libcurl4-openssl-dev \
+    zip \
+    openssl \
+    libmagickwand-dev \
+    libc-client-dev \
+    libkrb5-dev \
+    libpq-dev \
+    libfreetype6-dev \
+    libjpeg62-turbo-dev \
+    libpng-dev \
+    gnupg \
+    gdebi-core \
+    libpcsclite1 \
+    pcscd \
+    libssl-dev \
+    libsodium-dev \
+    libzmq3-dev \
+    libtool \
+    autoconf \
+    uuid-dev \
+    pkg-config && \
     rm -rf /var/lib/apt/lists/*
 
+# Устанавливаем Composer
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
 
-# Install useful tools and install important libaries
-RUN apt-get -y update && \
-    apt-get -y --no-install-recommends install nano wget \
-dialog \
-libsqlite3-dev \
-libsqlite3-0 && \
-    apt-get -y --no-install-recommends install default-mysql-client \
-zlib1g-dev \
-libzip-dev \
-libicu-dev && \
-    apt-get -y --no-install-recommends install --fix-missing apt-utils \
-build-essential \
-git \
-curl \
-libonig-dev && \
-    apt-get install -y iputils-ping && \
-    apt-get -y --no-install-recommends install --fix-missing libcurl4 \
-libcurl4-openssl-dev \
-zip \
-openssl && \
-    rm -rf /var/lib/apt/lists/* && \
-    curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
-
-# Install xdebug
+# Устанавливаем xdebug
 RUN pecl install xdebug-3.1.4 && \
     docker-php-ext-enable xdebug && \
     mkdir /var/log/xdebug
 
-# Install redis
+# Устанавливаем redis
 RUN pecl install redis-5.1.1 && \
     docker-php-ext-enable redis
 
-# Install imagick
+# Устанавливаем imagick
 RUN apt-get update && \
-    apt-get -y --no-install-recommends install --fix-missing libmagickwand-dev && \
+    apt-get install -y --no-install-recommends libmagickwand-dev && \
     rm -rf /var/lib/apt/lists/* && \
     pecl install imagick && \
     docker-php-ext-enable imagick
 
-# Enable php-imap
-RUN set -eux; \
-	apt-get update; \
-	apt-get install -y --no-install-recommends \
-		libc-client-dev \
-		libkrb5-dev \
-	; \
-	rm -rf /var/lib/apt/lists/*
-
-RUN set -eux; \
-	PHP_OPENSSL=yes docker-php-ext-configure imap --with-kerberos --with-imap-ssl; \
-	docker-php-ext-install imap
-
-# Other PHP7 Extensions
-
-RUN docker-php-ext-install pdo_mysql && \
-    docker-php-ext-install pdo_sqlite && \
-    docker-php-ext-install bcmath && \
-    docker-php-ext-install pcntl && \
-    docker-php-ext-install mysqli && \
-    docker-php-ext-install curl && \
-    docker-php-ext-install tokenizer && \
-    docker-php-ext-install json && \
-    docker-php-ext-install zip && \
-    docker-php-ext-install -j$(nproc) intl && \
-    docker-php-ext-install mbstring && \
-    docker-php-ext-install gettext && \
-    docker-php-ext-install calendar && \
-    docker-php-ext-install exif
-
-# Install Postgre PDO
+# Устанавливаем imap
 RUN apt-get update && \
-    apt-get install -y libpq-dev && \
+    apt-get install -y --no-install-recommends libc-client-dev libkrb5-dev && \
+    rm -rf /var/lib/apt/lists/* && \
+    PHP_OPENSSL=yes docker-php-ext-configure imap --with-kerberos --with-imap-ssl && \
+    docker-php-ext-install imap
+
+# Другие PHP-расширения
+RUN docker-php-ext-install pdo_mysql pdo_sqlite bcmath pcntl mysqli curl tokenizer json zip intl mbstring gettext calendar exif
+
+# Устанавливаем PostgreSQL PDO
+RUN apt-get install -y libpq-dev && \
     docker-php-ext-install pdo pdo_pgsql pgsql
 
-# Install Freetype 
-RUN apt-get -y update && \
-    apt-get --no-install-recommends install -y libfreetype6-dev \
-libjpeg62-turbo-dev \
-libpng-dev && \
+# Устанавливаем Freetype и gd
+RUN apt-get install -y libfreetype6-dev libjpeg62-turbo-dev libpng-dev && \
     rm -rf /var/lib/apt/lists/* && \
     docker-php-ext-configure gd --enable-gd --with-freetype --with-jpeg && \
     docker-php-ext-install gd
 
-# Insure an SSL directory exists
-RUN mkdir -p /etc/apache2/ssl
+# Включаем SSL и настройку Apache
+RUN mkdir -p /etc/apache2/ssl && \
+    a2enmod ssl rewrite headers
 
-# Enable SSL support
-RUN a2enmod ssl && a2enmod rewrite
+# Устанавливаем CSP
+COPY ./linux-arm64_deb/ /tmp/csp-debs/
+RUN dpkg -i /tmp/csp-debs/*.deb || apt-get install -fy
+ENV PATH="/opt/cprocsp/bin/aarch64:${PATH}"
 
-# Enable apache modules
-RUN a2enmod rewrite headers
+# Проверка установки CSP
+RUN which cryptcp && echo "cryptcp found" || echo "cryptcp not found"
+RUN which csrsign && echo "csrsign found" || echo "csrsign not found"
 
-# Cleanup
-RUN rm -rf /usr/src/*
-
-RUN apt-get update && \
-    apt-get install -y build-essential libtool autoconf uuid-dev pkg-config libsodium-dev libzmq3-dev && \
-    git clone https://github.com/zeromq/php-zmq.git && \
-    cd php-zmq && \
-    phpize && ./configure && \
-    make && make install && \
-    docker-php-ext-enable zmq;
-
+# Очистка временных файлов
+RUN rm -rf /usr/src/* /tmp/* /var/tmp/*
